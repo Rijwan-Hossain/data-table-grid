@@ -1,15 +1,47 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import {
-    Box, Table, Thead, Tbody, 
-    Tr, Th, Td, chakra, Button, 
+    Box, Text, Table, Thead, Tbody, 
+    Tr, Th, Td, chakra, Button, Input, 
     NumberInput, NumberInputField,
     NumberInputStepper, NumberIncrementStepper,
     NumberDecrementStepper, Flex, Select 
 } from '@chakra-ui/react'
 import { TriangleDownIcon, TriangleUpIcon } from "@chakra-ui/icons"
 
-import { useTable, useSortBy, usePagination, useGlobalFilter } from "react-table"
-import GlobalSearch from './GlobalSearch'
+import { useTable, useSortBy, usePagination, useGlobalFilter, useAsyncDebounce } from "react-table"
+
+
+// Search component 
+function GlobalSearch({ globalFilter, setGlobalFilter }) { 
+    const [value, setValue] = useState(globalFilter) 
+
+    const onChange = useAsyncDebounce(value => { 
+        // Set undefined to remove the filter entirely 
+        setGlobalFilter(value || undefined) 
+    }, 200) 
+
+    return ( 
+        <Box my={5}> 
+            <Text fontWeight="600"> Search </Text> 
+            <Input 
+                type="text" 
+                maxW="250px" 
+                variant="flushed" 
+                placeholder="Search" 
+                value={value || ''} 
+                onChange={e => { 
+                    setValue(e.target.value); 
+                    onChange(e.target.value); 
+                }} 
+            /> 
+        </Box> 
+    ) 
+} 
+
+
+
+
+
 
 function Datagrid( 
     { 
@@ -23,18 +55,32 @@ function Datagrid(
         tableHeightInPage, 
         selectNoOfRows 
     }) { 
-    // const columnList = useMemo(() => columns, []) 
-    // const dataList = useMemo(() => data, []) 
+    const skipPageResetRef = useRef() 
 
-    const [filterText, setFilterText] = useState('') 
+    const columnList = useMemo(() => columns, []) 
+    const dataList = useMemo(() => data, []) 
 
+    useEffect(() => { 
+        // After the table has updated, always remove the flag 
+        skipPageResetRef.current = false 
+    }) 
+    
     const tableInstance = useTable({ 
             columns, 
             data, 
             initialState: { pageIndex: 0, pageSize: defaultPageSize }, 
             manualPagination: true, 
             pageCount: controlledPageCount, 
-            autoResetPage: false 
+            autoResetPage: false, 
+            autoResetGlobalFilter: false, 
+            
+            autoResetFilters: !skipPageResetRef.current, 
+            autoResetExpanded: !skipPageResetRef.current,
+            autoResetGroupBy: !skipPageResetRef.current,
+            autoResetSelectedRows: !skipPageResetRef.current,
+            autoResetSortBy: !skipPageResetRef.current,
+            autoResetRowState: !skipPageResetRef.current,
+            // !skipPageResetRef.current
         }, 
         useGlobalFilter,  
         useSortBy,  
@@ -60,17 +106,19 @@ function Datagrid(
 
 
     useEffect(() => { 
-        fetchData({ pageIndex, pageSize }) 
-    }, [fetchData, pageIndex, pageSize]) 
+        fetchData({ pageIndex, pageSize, globalFilter, skipPageResetRef }) 
+    }, [fetchData, pageIndex, pageSize, globalFilter]) 
 
-    useEffect(() => { 
-        console.log({filterText});
-    }, [filterText]) 
     
+
+
     return ( 
         <Box> 
             <Box p={30} h={tableHeightInPage} overflow="auto"> 
-                <GlobalSearch filterText={filterText} setFilterText={setFilterText} /> 
+                <GlobalSearch 
+                    globalFilter={globalFilter} 
+                    setGlobalFilter={setGlobalFilter} 
+                /> 
 
                 <Table {...getTableProps()}> 
                     <Thead> 
@@ -141,8 +189,8 @@ function Datagrid(
 
 
 
-            <Box p="30px"> 
             {/* Pagination */} 
+            <Box p="30px"> 
                 <Flex mt="30px" flexWrap="wrap"> 
                     <Button 
                         onClick={() => gotoPage(0)} 
@@ -221,3 +269,5 @@ function Datagrid(
 } 
 
 export default Datagrid;
+
+

@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import {
   Box, Container 
 } from '@chakra-ui/react' 
@@ -13,44 +13,66 @@ function App() {
   let columns = [ 
     { 
       Header: 'ID', 
-      accessor: 'id'
+      accessor: '_id'
     }, 
     { 
       Header: 'Name', 
       accessor: 'name'
     }, 
     { 
-      Header: 'Email', 
-      accessor: 'email'
+      Header: 'Route', 
+      accessor: 'route'
     },  
     { 
       Header: 'Body', 
-      accessor: 'body'
+      accessor: 'menuType'
     } 
   ] 
 
-  let sortOn = ['ID', 'Name', 'Email'] 
+  // let sortOn = ['ID', 'Name', 'Email'] 
+  let sortOn = ['ID', 'Name', 'Route'] 
 
 
-  const fetchData = useCallback(({ pageSize, pageIndex }) => { 
-    console.clear(); 
+  const fetchData = useCallback(({ pageSize, pageIndex, globalFilter, skipPageResetRef }) => { 
+
     const fetchId = ++fetchIdRef.current 
+    let totalLength
+    if(globalFilter) { 
+      // Filtering on name field
+      axios.get(`http://192.168.1.227:3530/api/v1/menus?name=${globalFilter}`) 
+        .then((res) => { 
 
-    // use this call 
-    // *** axios.get(`API?page=${pageIndex}&limit=${pageSize}`) *** 
-    axios.get(`https://jsonplaceholder.typicode.com/comments?_start=${(pageIndex)* pageSize}&_limit=${pageSize}`) 
-      .then((res) => { 
-        const totalLength = res.length || 500 
-        const {data: serverData} = res 
+          totalLength = res.length || 500 
+          const {data: serverData} = res.data 
+          if (fetchId === fetchIdRef.current) { 
+            if(serverData.length >= 1) { 
+              skipPageResetRef.current = true 
+              setData(serverData) 
+              setPageCount(Math.ceil(totalLength/pageSize)) 
+            } 
+          } 
+        }) 
+        .catch(err => console.log(err, 'Data fetch error')) 
+    } 
+    else { 
+      // Pagination 
+      axios.get(`http://192.168.1.227:3530/api/v1/menus?page=${(pageIndex)+1}&limit=${pageSize}`) 
+        .then((res) => { 
+          totalLength = res.length || 500 
+          const {data: serverData} = res.data 
+          
+          if (fetchId === fetchIdRef.current) { 
+            skipPageResetRef.current = true 
+            setData(serverData) 
+            setPageCount(Math.ceil(totalLength/pageSize)) 
+          } 
+        }) 
+        .catch(err => console.log(err, 'Data fetch error')) 
+    }
+  }, [])  
 
-        if (fetchId === fetchIdRef.current) { 
-          setData(serverData) 
-          setPageCount(Math.ceil(totalLength/pageSize)) 
-        } 
-      }) 
-      .catch(err => console.log(err, 'Data fetch error')) 
-  }, []) 
 
+  
 
 
 
@@ -63,12 +85,11 @@ function App() {
             data={data} 
             columns={columns} 
             pageCount={pageCount} 
-            fetchData={fetchData}
-
+            fetchData={fetchData} 
             sortOn={sortOn} 
-            defaultPageSize={5}
-            tableHeightInPage='75vh'
-            selectNoOfRows={[5, 10, 20, 30, 50, 100]} /> 
+            defaultPageSize={3} 
+            tableHeightInPage='75vh' 
+            selectNoOfRows={[3, 10, 20, 30, 50, 100]} /> 
         </Box> 
       </Container> 
     </Box> 
